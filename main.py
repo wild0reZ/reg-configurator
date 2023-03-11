@@ -3,12 +3,17 @@ from PyQt5.QtGui import QStandardItemModel, QStandardItem
 import json
 from itertools import chain, count
 
+from JsonModel import JsonModel
+from TreeViewClass import TreeItem
+
 
 class Ui(QtWidgets.QMainWindow):
     def __init__(self):
         super(Ui, self).__init__()
         uic.loadUi(r'C:\Users\wildzer0\Documents\progetti\reg_configurator\reg_configurator.ui', self)
         self.registers_configuration = {}
+        self.model = JsonModel()
+
 
         self.actionOpen_datasheet_dump.triggered.connect(self.openDatasheetDump)
         self.actionSave_configuration.triggered.connect(self.saveConfiguration)
@@ -34,7 +39,7 @@ class Ui(QtWidgets.QMainWindow):
         filter = "JSON (*.json)"
         fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, filter=filter)
         with open(fileName, 'w') as f:
-            f.write(json.dumps(self.registers_configuration))
+            f.write(json.dumps(self.model.to_json()))
 
     def generateConfigurationFile(self, dump):
         prev_offset = -4
@@ -76,29 +81,10 @@ class Ui(QtWidgets.QMainWindow):
         self.showConfigurationAsTreeView()
 
     def showConfigurationAsTreeView(self):
-        model = QStandardItemModel(0, 1, self.treeView)
-        self.treeView.setModel(model)
-        i = 0
-        for peripheral, registers in self.registers_configuration.items():
-            root = QStandardItem('{}'.format(peripheral))
-            for register, props in registers.items():
-                child = QStandardItem(register)
-                for reg_prop_name, reg_prop_value in props.items():
-                    if not reg_prop_name == 'fields':
-                        inner_child = QStandardItem("{}: {}".format(reg_prop_name, reg_prop_value))
-                    else:
-                        inner_child = QStandardItem("{} ".format(reg_prop_name))
-                        for field, field_props in reg_prop_value.items():
-                                inner_inner_child = QStandardItem(field)
-                                inner_child.appendRow(inner_inner_child)
-                                for field_prop_name, field_prop_value in field_props.items():
-                                    leaf = QStandardItem("{}: {}".format(field_prop_name, field_prop_value))
-                                    inner_inner_child.appendRow(leaf)
-                    child.appendRow(inner_child)
-                root.appendRow(child)
-            model.setItem(i, 0, root)
-            self.treeView.setFirstColumnSpanned(i,self.treeView.rootIndex(),True)
-            i += 1
+        self.treeView.setModel(self.model)
+        self.model.load(self.registers_configuration)
+        self.treeView.header().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
+        self.treeView.setAlternatingRowColors(True)
 
 
     def calculateFieldMask(self, field_len):
