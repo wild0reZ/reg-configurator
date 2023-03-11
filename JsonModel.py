@@ -69,13 +69,15 @@ class JsonModel(QAbstractItemModel):
             role (Qt.ItemDataRole)
 
         """
+        editable_field_list = ['start_bit', 'rw_props', 'reset_value']
         if role == Qt.EditRole:
             item = index.internalPointer()
-            item.value = str(value)
+            if item.key in editable_field_list:
+                item.value = str(value)
 
-            self.dataChanged.emit(index, index, [Qt.EditRole])
+                self.dataChanged.emit(index, index, [Qt.EditRole])
 
-            return True
+                return True
         
         return False
 
