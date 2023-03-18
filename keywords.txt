@@ -1,0 +1,113 @@
+PROPS([
+    "autogen_fields_mask",  % mask will be generated using field_len parameter %
+    "enable_fields_check",  % for each register will be checked if the sum of field_len is <= than reg size %
+    "enable_offset_check",  % check if regs are aligned %
+    "autogen_offsets",      % autogenerate register's offset %
+    "custom_types",         % if this property is used user must declare custom types using TYPES keyoword. Diversely <stdint.h> will be included % 
+]); -> optional
+
+% user can explicitly declare the filename that will be used in .c/.h files. Elseway PERIPHEAL param will be used. %
+FILENAME(file_name:str:req); -> optional
+
+TYPES(
+    "UINT32"->32,
+    "UINT16"->16,
+    "UINT8"->8,
+);
+
+PERIPHEAL(name:str:req) %  %
+{
+    % desc will be used for comment generation % 
+    DESC(desc:str:req); -> optional
+
+    % The addr must be formattes as an HEX value. If not an error will be generated %
+    BASEADDR(addr:str:req); -> required
+
+    % size must be and integer multiple of 8 and <= 64. Otherwise an error will be generated %
+    REGSSIZE(size:int:req); -> required
+
+    % value can be LE, BE or BI. If the keyword is omitted LE will be used. Other values will generate an error %
+    ENDIANNESS(value:str:req); -> optional
+
+    % star reg def
+    CHANNELS(               % in some cases periphar has more than one channel. This allows to generate a specific code structure %
+        n_channels:int:req, % peripheal's channels number. %
+        REG(name:str:req) 
+        [
+            DESC(desc:str:req);
+            RESET(value:str:req); -> optional   % The value must be formattes as an HEX value. If not an error will be generated %
+            RW(value:str:req); -> required      % value can be R, W or RW. Other values will generate an error %
+            FIELDS(
+                %- 
+                    FIELD(
+                        name:str:req,       % name of the field %
+                        start_bit:int:req,  % field starting bit inside the register %
+                        field_len:int:req,  % field len inside the register %
+                        rw:str:opt,         % value can be R, W or RW. Other values will generate an error. If omitted register RW property will be used %
+                        desc:str:opt        % field description. This will be used as field comment. DESC keyword must be used %
+                    ), 
+                -%
+
+                FIELD("AA", 0, 1),
+                FIELD("BB", 1, 5, DESC("BB Field")),
+                FIELD("CC", 0, 1, "R"),
+            );
+        ],
+        REG(name:str:req)
+        [
+            DESC(desc:str:req);
+            RESET();
+            RW();
+            FIELDS(
+                %- 
+                REPFIELD(
+                    name:str:req,       % name of the field %
+                    start_bit:int:req,  % field starting bit inside the register. This will be autoincremented automatically %
+                    field_len:int:req,  % field len inside the register. All fields will have same len. %
+                    rw:str:opt,         % value can be R, W or RW. Other values will generate an error. If omitted register RW property will be used %
+                    n_times:int:req,    % number of times that the field must be repeated %
+                    start_index:int,opt % incremental index that will be appended to the field name. If omitted will be 0 %
+                    desc:str:opt        % field description. This will be used as field comment. DESC keyword must be used.  %
+                ), 
+                -%
+                REPFIELD("AAA", 5, 2, 2, description %optional%),
+
+                %-
+                    It's like writing:
+
+                    FIELD("AAA0", 5, 2);
+                    FIELD("AAA1", 7, 2);
+                -%
+            );
+        ]
+    );
+
+
+    REG(name:str:req)
+    [
+        DESC(desc:str:req);
+        RESET();
+        RW();
+        FIELDS(
+            FIELD("PT", 0, 1,),
+            FIELD("TA", 1, 5, DESC("TA Field")),
+        );
+    ],
+    RESERVED(n_bytes:int:req); % will insert a reserved area of memory expressed as uint8_t (if not specified otherwise via "custom_types" property in PROPS keyword) between registers %
+
+    % end reg def
+
+    % start fun def
+    FUN(
+        name:str:req,           % name of the function %
+        params->type:lst:req,   % list that has values formatted as follow param->type. The list can be empty if the function has no parameters  %
+        return_type:str:req,    % return type of the function reppresented as string, i.e. "void", "UINT32" %
+        desc:str:opt,           % function description. This will be used as function comment. DESC keyword must be used %
+    );
+
+    FUN("Set_Reg1", ["val->UINT32"], "void", DESC("Function for setting the value of Reg1"));
+
+    FUN("Get_Reg1", [], "UINT32");
+
+    % end fun def
+}

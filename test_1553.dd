@@ -1,0 +1,151 @@
+PROPS([
+    "autogen_fields_mask",  % mask will be generated using field_len parameter %
+    "enable_fields_check",  % for each register will be checked if the sum of field_len is <= than reg size %
+    "enable_offset_check",  % check if regs are aligned %
+    "autogen_offsets",      % autogenerate register's offset %
+]); -> optional
+
+% user can explicitly declare the filename that will be used in .c/.h files %
+FILENAME(file_name:str:req); -> optional
+
+PERIPHEAL(name:str:req) %  %
+{
+    % desc will be used for comment generation % 
+    DESC(desc:str:req); -> optional
+
+    % The addr must be formattes as an HEX value %
+    BASEADDR(addr:str:req); 
+
+    % size must be and integer multiple of 8 and <= 64. Otherwise an error will be generated %
+    REGSSIZE(size:int:req); -> required
+
+    % value can be LE, BE or BI. If the keyword is omitted LE will be used. Other values will generate an error %
+    ENDIANNESS(value:str:req); -> optional
+
+    % star reg def
+    CHANNELS(
+        n_channels:int:req,
+        REG(name:str:req, type:str:req)
+        [
+            DESC();
+            RESET();
+            RW();
+            FIELDS(
+                % FIELD(name:str:req, start_bit:int:req, field_len:int:req, rw:str:opt, desc:str:opt), %
+                FIELD("AA", 0, 1),
+                FIELD("BB", 1, 5, "BB Field"),
+            );
+        ],
+        REG(name:str:req, type:str:req)
+        [
+            DESC();
+            RESET();
+            RW();
+            FIELDS(
+                % REPFIELD(name:str:req, start_bit:int:req, field_len:int:req, n_times:int:req, rw:str:opt, desc:str:opt), %
+                REPFIELD("AAA", 32, description %optional%),
+            );
+        ]
+    );
+
+
+    REG(reg_name:ty)
+    [
+        DESC();
+        RESET();
+        RW();
+        FIELDS(
+            FIELD("PT", 0, 1,),
+            FIELD("TA", 1, 5, "TA Field"),
+        );
+    ],
+    RESERVED(byte_number);
+
+    % end reg def
+
+    % start fun def
+
+    FUN("Set_Reg1", [val:"UINT32"], "void", "Function for setting the value of Reg1");
+
+    FUN("Get_Reg1", [], "UINT32");
+
+    % end fun def
+}
+
+%-
+    Some peripheral has multiple sub-peripheal that have same rigster structure
+    with changing offset. This can be calculated as:
+        offs + x*0x40 [x...n sub-peripheral]
+    
+    In the final code this can be structured as follow:
+        - a parent structure containing common registers
+        - an array of child structure containing specific channel registers
+
+    so, like this:
+
+    typedef struct
+    {
+        child_struct arr[n_sub_peripheral];
+        UINT32 cREG1;
+        UINT32 cREG2;
+    }
+    parent_struct;
+
+    typedef struct
+    {
+        UINT32 sREG1;
+        UINT32 sREG2;
+    }
+    child_struct;
+
+    To have a valid memory-mapped struct the user has to add RESERVED(byte_number); bytes correctly
+
+    ====================================================================================
+
+    If a register has the max num of fields and their name are XXXy with XXX field name
+    and y an incremental number going from 1 to n, the user should have a method for
+    write this easily. So a keyword is introduced.
+
+    REPFIELD(field_name, n_times, field_desc %optional%);
+
+    This will yield a list of field having the standard structure, like:
+        FIELD(field_name, start_bit, field_len, description %optional%),
+
+    ====================================================================================
+
+    After the regs declaration, driver's function can be defined using the following
+    syntax:
+
+        FUN(fun_name, [par1:ty, par2:ty, ..., parn:ty], return_type);
+
+    type parameter must be written as a string, for example:
+        - "UINT32" for return_type
+        - par1:"UINT32" for declaring parameter type
+
+    This will generate, in C code, functions definition (prototype) in header (.h) 
+    module and function declaration without function body in .c file.
+
+    ====================================================================================
+
+    OFFS() is used purely for sorting purposes? Maybe this keyword can be removed because
+    the offset is implicitly calculated using registers size and the number of peripheral
+    registers.
+
+    ====================================================================================
+
+    This specifications is built starting from microchip's style register settings.
+    I need to consider also other types of "registers settings" and make this spacification
+    more abstract from the real hardware.
+
+    Looking the GR740 datasheet, Gaisler consider unused fields in the register as RESERVED
+    and each field has the R/W property.
+
+    So, the RW property can be extended to the fields.
+
+    The solution could be the following:
+
+    FIELD(name:str:req, start_bit:int:req, field_len:int:req, rw:str:opt, desc:str:opt)
+
+    If rw parameter is omitted register RW property will be used.
+
+-%
